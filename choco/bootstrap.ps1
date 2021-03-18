@@ -56,6 +56,7 @@ $CONFIG = @{
 
 # Do not edit
 $DRIVE_NAME = 'BOOTSTRAP'
+$DRIVE_PATH = $DRIVE_NAME + ':\'
 $PROVIDER_PATH = "$env:ProgramFiles\PackageManagement\ProviderAssemblies"
 $NUGET_PATH = "$env:ProgramData\Microsoft\Windows\PowerShell\PowerShellGet"
 $GLAB_MODULE = 'glab'
@@ -71,7 +72,7 @@ if (!(Test-Path $PROVIDER_PATH) -or !(Test-Path $NUGET_PATH)) {
 # Check for NuGet provider
 if (!(Test-Path $PROVIDER_PATH)) {
     Write-Verbose 'Downloading NuGet provider...'
-    $archive_path = Join-Path -Path 'BOOTSTRAP:\' -ChildPath $CONFIG.provider.file_name
+    $archive_path = Join-Path -Path $DRIVE_PATH -ChildPath $CONFIG.provider.file_name
     New-Item -Type Directory -Path $PROVIDER_PATH -Force | Out-Null
     Expand-Archive -Path $archive_path -DestinationPath $PROVIDER_PATH -Force
 }
@@ -80,7 +81,7 @@ if (!(Test-Path $PROVIDER_PATH)) {
 if (!(Test-Path $NUGET_PATH)) {
     # Copy NuGet executable to local machine
     Write-Verbose 'Downloading NuGet executable...'
-    $remote_nuget_path = Join-Path -Path 'BOOTSTRAP:\' -ChildPath $CONFIG.nuget.file_name
+    $remote_nuget_path = Join-Path -Path $DRIVE_PATH -ChildPath $CONFIG.nuget.file_name
     $local_nuget_path = Join-Path $NUGET_PATH $CONFIG.nuget.file_name
     New-Item -Type Directory -Path $NUGET_PATH -Force | Out-Null
     Copy-Item -Path $remote_nuget_path -Destination $local_nuget_path
