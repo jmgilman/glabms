@@ -60,6 +60,17 @@ $DRIVE_PATH = $DRIVE_NAME + ':\'
 $PROVIDER_PATH = "$env:ProgramFiles\PackageManagement\ProviderAssemblies"
 $NUGET_PATH = "$env:ProgramData\Microsoft\Windows\PowerShell\PowerShellGet"
 $GLAB_MODULE = 'glab'
+$MIN_EXECUTION_POLICY = 'RemoteSigned'
+
+# Check the execution policy is configured appropriately
+if ((Get-ExecutionPolicy) -ne $MIN_EXECUTION_POLICY) {
+    Write-Error ("The current execution policy of '$(Get-ExecutionPolicy)' " +
+        "does not match the required minimum policy of '$MIN_EXECUTION_POLICY'. " +
+        'Please run the following command as an administrator to update the ' + 
+        'execution policy:')
+    Write-Error "Set-ExecutionPolicy -ExecutionPolicy $MIN_EXECUTION_POLICY"
+    Exit
+}
 
 # Check if we need to mount SMB share
 $full_provider_path = Join-Path $PROVIDER_PATH "nuget\$($CONFIG.provider.min_version)"
