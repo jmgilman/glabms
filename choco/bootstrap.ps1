@@ -68,7 +68,7 @@ if (!(Test-Path $full_provider_path) -or !(Test-Path $full_nuget_path)) {
     # Need the user credentials to attach to the SMB share
     $cred = Get-Credential -Message "Enter credentials to connect to $($CONFIG.mount.address)"
     $mount_path = Join-Path -Path $CONFIG.mount.address -ChildPath $CONFIG.mount.share
-    New-PSDrive -Name $DRIVE_NAME -PSProvider 'FileSystem' -Root $mount_path -Credential $cred
+    New-PSDrive -Name $DRIVE_NAME -PSProvider 'FileSystem' -Root $mount_path -Credential $cred | Out-Null
 }
 
 # Check for NuGet provider
@@ -93,7 +93,7 @@ if (!(Test-Path $full_nuget_path)) {
 if (!(Get-PSRepository | Where-Object Name -EQ $CONFIG.proget.feeds.posh)) {
     # Import the newly copied provider
     Write-Verbose 'Importing provider...'
-    Import-PackageProvider -Name NuGet -RequiredVersion $CONFIG.provider.min_version
+    Import-PackageProvider -Name NuGet -RequiredVersion $CONFIG.provider.min_version | Out-Null
 
     # Register local repository as trusted
     Write-Verbose 'Registering local Powershell repository...'
