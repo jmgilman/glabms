@@ -1,0 +1,117 @@
+<#
+.Synopsis
+   Bootstraps an offline machine with Chocolatey
+.DESCRIPTION
+   This script is intended to be run by an offline machine deployed within glab
+   and will perform the necessary steps to download and install Chocolatey to
+   the machine for package management. This script expects infrastructure to
+   already be in place, including:
+     * A SMB share configured at $CONFIG.mount.address with a $CONFIG.mount.share share
+     * A copy of the NuGet provider uploaded to {MOUNT}\$CONFIG.provider.file_name
+     * A copy of the NuGet binary uploaded to {MOUNT}\$CONFIG.nuget.file_name
+     * A ProGet server running at $CONFIG.proget.server
+     * A Powershell feed configured at $CONFIG.proget.feeds.posh
+       * The feed must have the "glab" module uploaded to it
+     * A Chocolatey feed configured at $CONFIG.proget.feeds.choco
+       * The feed must have the Chocolatey NuGet package uploaded to it
+    This script will automatically download the NuGet provider and executable
+    as needed and then download and install the Chocolatey NuGet package from
+    the provided ProGet server.
+    This script is intended to be uploaded to a web server and then executed
+    much like the default Chocolatey install script. See the example below.
+.EXAMPLE
+   iex ((New-Object System.Net.WebClient).DownloadString('https://myserver.com/bootstrap.ps1'))
+.NOTES
+    Name: bootstrap.ps1
+    Author: Joshua Gilman (@jmgilman)
+#>
+
+# Don't let the script continue with errors
+$ErrorActionPreference = 'Stop'
+
+# Modify the values below before uploading
+$CONFIG = @{
+    choco    = @{
+        package_name = 'chocolatey'
+    }
+    mount    = @{
+        address = '\\nas.gilman.io'
+        share   = 'Software'
+    }
+    nuget    = @{
+        file_name = 'nuget.exe'
+    }
+    proget   = @{
+        server = 'http://proget.gilman.io:8624'
+        feeds  = @{
+            posh  = 'internal-powershell'
+            choco = 'internal-chocolatey'
+        }
+    }
+    provider = @{
+        file_name   = 'nuget.zip'
+        min_version = '4.1.0'
+    }
+}
+
+# Do not edit
+$DRIVE_NAME = 'BOOTSTRAP'
+$PROVIDER_PATH = "$env:ProgramFiles\PackageManagement\ProviderAssemblies"
+$NUGET_PATH = "$env:ProgramData\Microsoft\Windows\PowerShell\PowerShellGet"
+$GLAB_MODULE = 'glab'
+
+# Check if we need to mount SMB share
+if (!(Test-Path $PROVIDER_PATH) -or !(Test-Path $NUGET_PATH)) {
+    # Need the user credentials to attach to the SMB share
+    $cred = Get-Credential -Message "Enter credentials to connect to $($CONFIG.mount.address)"
+    $mount_path = Join-Path -Path $CONFIG.mount.address -ChildPath $CONFIG.mount.share
+    New-PSDrive -Name $DRIVE_NAME -PSProvider 'FileSystem' -Root $mount_path -Credential $cred
+}
+
+# Check for NuGet provider
+if (!(Test-Path $PROVIDER_PATH)) {
+    Write-Verbose 'Downloading NuGet provider...'
+    $archive_path = Join-Path -Path 'BOOTSTRAP:\' -ChildPath $CONFIG.provider.file_name
+    New-Item -Type Directory -Path $PROVIDER_PATH -Force | Out-Null
+    Expand-Archive -Path $archive_path -DestinationPath $PROVIDER_PATH -Force
+}
+
+# Check for NuGet executable
+if (!(Test-Path $NUGET_PATH)) {
+    # Copy NuGet executable to local machine
+    Write-Verbose 'Downloading NuGet executable...'
+    $remote_nuget_path = Join-Path -Path 'BOOTSTRAP:\' -ChildPath $CONFIG.nuget.file_name
+    $local_nuget_path = Join-Path $NUGET_PATH $CONFIG.nuget.file_name
+    New-Item -Type Directory -Path $NUGET_PATH -Force | Out-Null
+    Copy-Item -Path $remote_nuget_path -Destination $local_nuget_path
+}
+
+# Check for internal Powershell repository
+if (!(Get-PSRepository | Where-Object Name -EQ $CONFIG.proget.feeds.posh)) {
+    # Import the newly copied provider
+    Write-Verbose 'Importing provider...'
+    Import-PackageProvider -Name NuGet -RequiredVersion $CONFIG.provider.min_version
+
+    # Register local repository as trusted
+    Write-Verbose 'Registering local Powershell repository...'
+    $url = ($CONFIG.proget.server, 'nuget', $CONFIG.proget.feeds.posh) -join '/'
+    Register-PSRepository -Name $CONFIG.proget.feeds.posh -SourceLocation $url -InstallationPolicy Trusted 
+}
+
+# Check for glab module
+if (!(Get-InstalledModule | Where-Object Name -EQ $GLAB_MODULE)) {
+    Write-Verbose 'Downloading glab module...'
+    Install-Module -Name $GLAB_MODULE -Repository $CONFIG.proget.feeds.posh 
+}
+
+# Import module
+Import-Module -Name $GLAB_MODULE
+
+# Get the download URL for the Chocolatey NuGet package
+Write-Verbose 'Getting chocolatey URL...'
+$chocoFeedURL = ($CONFIG.proget.server, 'nuget', $CONFIG.proget.feeds.choco) -join '/'
+$chocoDownloadURL = Get-LatestNuGetPackage -FeedURL $chocoFeedURL -PackageName $CONFIG.choco.package_name
+
+# Install Chocolatey
+Write-Verbose 'Installing Chocolatey...'
+Install-Chocolatey -NuGetURL $chocoDownloadURL -TempFolder $(New-TempFolder) | Out-Null
