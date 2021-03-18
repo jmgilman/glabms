@@ -78,7 +78,7 @@ Function Get-LatestNuGetPackage {
 
     PROCESS {
         $url = ($FeedURL.Trim('/'), "Packages()?\\`$filter=(Id%20eq%20%27$PackageName%27)%20and%20IsLatestVersion") -join '/'
-        [xml]$res = Invoke-WebRequest -Uri $url
+        [xml]$res = Invoke-WebRequest -Uri $url -UseBasicParsing
         $res.feed.entry.content.src
     }
 
