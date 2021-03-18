@@ -50,7 +50,7 @@ $CONFIG = @{
     }
     provider = @{
         file_name   = 'nuget.zip'
-        min_version = '4.1.0'
+        min_version = '2.8.5.201'
     }
 }
 
@@ -62,7 +62,9 @@ $NUGET_PATH = "$env:ProgramData\Microsoft\Windows\PowerShell\PowerShellGet"
 $GLAB_MODULE = 'glab'
 
 # Check if we need to mount SMB share
-if (!(Test-Path $PROVIDER_PATH) -or !(Test-Path $NUGET_PATH)) {
+$full_provider_path = Join-Path $PROVIDER_PATH "nuget\$($CONFIG.provider.min_version)"
+$full_nuget_path = Join-Path $NUGET_PATH $CONFIG.nuget.file_name
+if (!(Test-Path $full_provider_path) -or !(Test-Path $full_nuget_path)) {
     # Need the user credentials to attach to the SMB share
     $cred = Get-Credential -Message "Enter credentials to connect to $($CONFIG.mount.address)"
     $mount_path = Join-Path -Path $CONFIG.mount.address -ChildPath $CONFIG.mount.share
@@ -70,7 +72,7 @@ if (!(Test-Path $PROVIDER_PATH) -or !(Test-Path $NUGET_PATH)) {
 }
 
 # Check for NuGet provider
-if (!(Test-Path $PROVIDER_PATH)) {
+if (!(Test-Path $full_provider_path)) {
     Write-Verbose 'Downloading NuGet provider...'
     $archive_path = Join-Path -Path $DRIVE_PATH -ChildPath $CONFIG.provider.file_name
     New-Item -Type Directory -Path $PROVIDER_PATH -Force | Out-Null
@@ -78,7 +80,7 @@ if (!(Test-Path $PROVIDER_PATH)) {
 }
 
 # Check for NuGet executable
-if (!(Test-Path $NUGET_PATH)) {
+if (!(Test-Path $full_nuget_path)) {
     # Copy NuGet executable to local machine
     Write-Verbose 'Downloading NuGet executable...'
     $remote_nuget_path = Join-Path -Path $DRIVE_PATH -ChildPath $CONFIG.nuget.file_name
