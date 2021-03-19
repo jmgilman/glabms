@@ -7,9 +7,9 @@
    internet access. The script will download required files as well as copy
    required installation files from the given paths (see README for instructions).
 .EXAMPLE
-   .\setup.ps1 -ProGetPath C:\path\to\proget -SqlPath C:\path\to\sql
+   .\download.ps1 -ProGetPath C:\path\to\proget -SqlPath C:\path\to\sql
 .NOTES
-    Name: setup.ps1
+    Name: download.ps1
     Author: Joshua Gilman (@jmgilman)
 #>
 
