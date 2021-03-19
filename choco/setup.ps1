@@ -1,21 +1,13 @@
 <#
 .Synopsis
-   Facilitates downloading and uploading the files needed for bootstrapping a
-   machine with Chocolatey
+   Downloads and copies all required files into the current working directory
+   under the 'files' folder. 
 .DESCRIPTION
    This script is intended to be run by a machine deployed within glab that has
-   internet access. The script should first be run with the 'Download' operation
-   and pointed to a local path. Once the files have been downloaded, depending
-   on network access, the script should be re-run with the 'Upload' operation
-   and pointed to the SMB share that will host the bootstrap files. It may be
-   necessary to transfer the files to an offline machine that has access to the
-   desired SMB share.
-   Note that the script expects local copies of the ProGet and SQL Express
-   installation files to be present. Refer to the lab documentation on how to
-   obtain these files.
+   internet access. The script will download required files as well as copy
+   required installation files from the given paths (see README for instructions).
 .EXAMPLE
-   .\setup.ps1 -Operation Download -Path C:\my\temp\path -ProGetPath C:\path\to\proget -SqlPath C:\path\to\sql
-   .\setup.ps1 -Operation Upload -Path C:\my\temp\path -MountPath \\my.nas.io\path
+   .\setup.ps1 -ProGetPath C:\path\to\proget -SqlPath C:\path\to\sql
 .NOTES
     Name: setup.ps1
     Author: Joshua Gilman (@jmgilman)
@@ -27,33 +19,11 @@ param(
         Mandatory = $true,
         ValueFromPipeline = $true,
         ValueFromPipelineByPropertyName = $true,
-        Position = 1
-    )]
-    [ValidateSet('Download', 'Upload')]
-    [string]  $Operation,
-    [Parameter(
-        Mandatory = $true,
-        ValueFromPipeline = $true,
-        ValueFromPipelineByPropertyName = $true,
-        Position = 2
-    )]
-    [string]  $Path,
-    [Parameter(
-        Mandatory = $false,
-        ValueFromPipeline = $true,
-        ValueFromPipelineByPropertyName = $true,
-        Position = 3
-    )]
-    [string]  $MountPath,
-    [Parameter(
-        Mandatory = $false,
-        ValueFromPipeline = $true,
-        ValueFromPipelineByPropertyName = $true,
         Position = 4
     )]
     [string]  $ProGetPath,
     [Parameter(
-        Mandatory = $false,
+        Mandatory = $true,
         ValueFromPipeline = $true,
         ValueFromPipelineByPropertyName = $true,
         Position = 5
@@ -88,7 +58,6 @@ $CONFIG = @{
 }
 
 # Do not edit
-$DRIVE_NAME = 'UPLOAD'
 $PROVIDER_PATH = "$env:ProgramFiles\PackageManagement\ProviderAssemblies"
 
 function Get-Provider {
@@ -253,56 +222,26 @@ function Get-Sql {
     Compress-Archive -Path $SqlPath -DestinationPath (Join-Path $Path $SqlFileName)
 }
 
-function Submit-Files {
-    param(
-        [Parameter(
-            Mandatory = $true,
-            ValueFromPipeline = $true,
-            ValueFromPipelineByPropertyName = $true,
-            Position = 1
-        )]
-        [string]  $MountPath,
-        [Parameter(
-            Mandatory = $true,
-            ValueFromPipeline = $true,
-            ValueFromPipelineByPropertyName = $true,
-            Position = 2
-        )]
-        [string]  $Path
-    )
+$local_path = Join-Path (Get-Location) 'files'
 
-    # Connect to mount
-    $cred = Get-Credential -Message "Enter credentials to connect to $MountPath..."
-    New-PSDrive -Name $DRIVE_NAME -PSProvider 'FileSystem' -Root $MountPath -Credential $cred | Out-Null
-
-    # Copy files
-    Copy-Item -Path (Join-Path $Path '*') -Destination ($DRIVE_NAME + ':\') -Recurse
-
-    # Disconnect from mount
-    Remove-PSDrive -Name $DRIVE_NAME
+# Check if local path exists
+if (Test-Path $local_path) {
+    # Delete all contents before downloading
+    Remove-Item (Join-Path $local_path '*') -Recurse -Force
+}
+else {
+    # Create path
+    New-Item -ItemType Directory -Path $local_path -Force
 }
 
-switch ($Operation) {
-    'Download' {
-        Get-Provider -Name $CONFIG.provider.name -FileName $CONFIG.provider.file_name -Version $CONFIG.provider.version -Path $Path
-        Get-NuGet -Url $CONFIG.nuget.url -FileName $CONFIG.nuget.file_name -Path $Path
-        Get-Bootstrap -Url $CONFIG.bootstrap.url -BootstrapPath $CONFIG.bootstrap.path -Path $Path
+Get-Provider -Name $CONFIG.provider.name -FileName $CONFIG.provider.file_name -Version $CONFIG.provider.version -Path $local_path
+Get-NuGet -Url $CONFIG.nuget.url -FileName $CONFIG.nuget.file_name -Path $local_path
+Get-Bootstrap -Url $CONFIG.bootstrap.url -BootstrapPath $CONFIG.bootstrap.path -Path $local_path
 
-        if ($PSBoundParameters.ContainsKey('ProGetPath')) {
-            Get-ProGet -ProGetPath $ProGetPath -ProGetFileName $CONFIG.proget.file_name -Path $Path
-        }
+if ($PSBoundParameters.ContainsKey('ProGetPath')) {
+    Get-ProGet -ProGetPath $ProGetPath -ProGetFileName $CONFIG.proget.file_name -Path $local_path
+}
 
-        if ($PSBoundParameters.ContainsKey('SqlPath')) {
-            Get-Sql -SqlPath $SqlPath -SqlFileName $CONFIG.sql.file_name -Path $Path
-        }
-        break
-    }
-    'Upload' {
-        if (!$PSBoundParameters.ContainsKey('MountPath')) {
-            Write-Error 'You must pass a MountPath when uploading files'
-            exit
-        }
-        Submit-Files -MountPath $MountPath -Path $Path
-        break
-    }
+if ($PSBoundParameters.ContainsKey('SqlPath')) {
+    Get-Sql -SqlPath $SqlPath -SqlFileName $CONFIG.sql.file_name -Path $local_path
 }
