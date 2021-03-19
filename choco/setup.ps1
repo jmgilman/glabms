@@ -49,11 +49,15 @@ $ErrorActionPreference = 'Stop'
 
 # Modify the values below before running
 $CONFIG = @{
-    nuget    = @{
+    bootstrap = @{
+        url  = 'https://github.com/jmgilman/glabms/archive/main.zip'
+        path = 'glabms-main\choco\bootstrap.ps1'
+    }
+    nuget     = @{
         url       = 'https://aka.ms/psget-nugetexe'
         file_name = 'nuget.exe'
     }
-    provider = @{
+    provider  = @{
         name      = 'NuGet'
         version   = '2.8.5.201'
         file_name = 'nuget.zip'
@@ -135,6 +139,41 @@ function Get-NuGet {
     Invoke-WebRequest -Uri $Url -OutFile (Join-Path $Path $FileName)
 }
 
+function Get-Bootstrap {
+    param(
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 1
+        )]
+        [string]  $Url,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 2
+        )]
+        [string]  $Path,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 2
+        )]
+        [string]  $BootstrapPath
+    )
+    # Download source to temporary folder
+    $temp_folder = New-Item -Type Directory -Path $(Join-Path $Env:Temp $(New-Guid))
+    Invoke-WebRequest -Uri $Url -OutFile (Join-Path $temp_folder 'glab.zip')
+
+    # Extract archive
+    Expand-Archive -Path (Join-Path $temp_folder 'glab.zip') -DestinationPath $temp_folder
+
+    # Copy the bootstrap script to the path
+    Copy-Item (Join-Path $temp_folder $BootstrapPath) $Path
+}
+
 function Submit-Files {
     param(
         [Parameter(
@@ -168,6 +207,7 @@ switch ($Operation) {
     'Download' {
         Get-Provider -Name $CONFIG.provider.name -FileName $CONFIG.provider.file_name -Version $CONFIG.provider.version -Path $Path
         Get-NuGet -Url $CONFIG.nuget.url -FileName $CONFIG.nuget.file_name -Path $Path
+        Get-Bootstrap -Url $CONFIG.bootstrap.url -BootstrapPath $CONFIG.bootstrap.path -Path $Path
         break
     }
     'Upload' {
