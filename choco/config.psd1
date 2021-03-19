@@ -1,20 +1,12 @@
 @{
-    bootstrap = @{
-        url  = 'https://github.com/jmgilman/glabms/archive/main.zip'
-        path = 'glabms-main\choco\bootstrap.ps1'
-    }
-    choco     = @{
+    choco    = @{
         package_name = 'chocolatey'
     }
-    mount     = @{
-        address = '\\nas.gilman.io'
-        share   = 'Software'
-    }
-    nuget     = @{
+    nuget    = @{
         url       = 'https://aka.ms/psget-nugetexe'
         file_name = 'nuget.exe'
     }
-    proget    = @{
+    proget   = @{
         server    = 'http://proget.gilman.io:8624'
         file_name = 'proget.zip'
         feeds     = @{
@@ -22,12 +14,13 @@
             choco = 'internal-chocolatey'
         }
     }
-    provider  = @{
+    provider = @{
         name      = 'NuGet'
-        file_name = 'nuget.zip'
+        file_name = 'provider.zip'
         version   = '2.8.5.201'
+        path      = 'PackageManagement\ProviderAssemblies'
     }
-    sql       = @{
+    sql      = @{
         file_name = 'sql.zip'
     }
 }

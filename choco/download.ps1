@@ -7,7 +7,7 @@
    internet access. The script will download required files as well as copy
    required installation files from the given paths (see README for instructions).
 .EXAMPLE
-   .\download.ps1 -ProGetPath C:\path\to\proget -SqlPath C:\path\to\sql
+   .\download.ps1 -ConfigFile .\choco\config.psd1 -ProGetPath C:\path\to\proget -SqlPath C:\path\to\sql
 .NOTES
     Name: download.ps1
     Author: Joshua Gilman (@jmgilman)
@@ -19,46 +19,24 @@ param(
         Mandatory = $true,
         ValueFromPipeline = $true,
         ValueFromPipelineByPropertyName = $true,
-        Position = 4
+        Position = 1
+    )]
+    [string]  $ConfigFile,
+    [Parameter(
+        Mandatory = $true,
+        ValueFromPipeline = $true,
+        ValueFromPipelineByPropertyName = $true,
+        Position = 2
     )]
     [string]  $ProGetPath,
     [Parameter(
         Mandatory = $true,
         ValueFromPipeline = $true,
         ValueFromPipelineByPropertyName = $true,
-        Position = 5
+        Position = 3
     )]
     [string]  $SqlPath
 )
-
-# Don't let the script continue with errors
-$ErrorActionPreference = 'Stop'
-
-# Modify the values below before running
-$CONFIG = @{
-    bootstrap = @{
-        url  = 'https://github.com/jmgilman/glabms/archive/main.zip'
-        path = 'glabms-main\choco\bootstrap.ps1'
-    }
-    nuget     = @{
-        url       = 'https://aka.ms/psget-nugetexe'
-        file_name = 'nuget.exe'
-    }
-    proget    = @{
-        file_name = 'proget.zip'
-    }
-    provider  = @{
-        name      = 'NuGet'
-        version   = '2.8.5.201'
-        file_name = 'nuget.zip'
-    }
-    sql       = @{
-        file_name = 'sql.zip'
-    }
-}
-
-# Do not edit
-$PROVIDER_PATH = "$env:ProgramFiles\PackageManagement\ProviderAssemblies"
 
 function Get-Provider {
     param(
@@ -89,18 +67,25 @@ function Get-Provider {
             ValueFromPipelineByPropertyName = $true,
             Position = 4
         )]
+        [string]  $ProviderPath,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 5
+        )]
         [string]  $Path
     )
 
     # Check if the provider is already installed on the local system
-    $full_provider_path = Join-Path $PROVIDER_PATH "nuget\$Version"
+    $full_provider_path = Join-Path $ProviderPath "nuget\$Version"
     if (!(Test-Path $full_provider_path)) {
         Write-Verbose 'Installing the NuGet provider to the local machine...'
         Install-PackageProvider -Name $Name -RequiredVersion $Version -Force | Out-Null
     }
 
     # Copy the provider to the path
-    Compress-Archive -Path (Join-Path $PROVIDER_PATH 'nuget') -DestinationPath (Join-Path $Path $FileName) -Force
+    Compress-Archive -Path (Join-Path $ProviderPath 'nuget') -DestinationPath (Join-Path $Path $FileName) -Force
 }
 
 function Get-NuGet {
@@ -133,20 +118,6 @@ function Get-NuGet {
 
 function Get-Bootstrap {
     param(
-        [Parameter(
-            Mandatory = $true,
-            ValueFromPipeline = $true,
-            ValueFromPipelineByPropertyName = $true,
-            Position = 1
-        )]
-        [string]  $Url,
-        [Parameter(
-            Mandatory = $true,
-            ValueFromPipeline = $true,
-            ValueFromPipelineByPropertyName = $true,
-            Position = 2
-        )]
-        [string]  $BootstrapPath,
         [Parameter(
             Mandatory = $true,
             ValueFromPipeline = $true,
@@ -215,26 +186,23 @@ function Get-Sql {
     Compress-Archive -Path $SqlPath -DestinationPath (Join-Path $Path $SqlFileName)
 }
 
-$local_path = Join-Path (Get-Location) 'files'
+# Don't let the script continue with errors
+$ErrorActionPreference = 'Stop'
 
-# Check if local path exists
+$CONFIG = Import-PowerShellDataFile $ConfigFile
+$local_path = Join-Path (Get-Location) 'files'
+$provider_path = Join-Path $env:ProgramFiles $CONFIG.provider.path
+
+# If local path exists, clear it out, otherwise create it
 if (Test-Path $local_path) {
-    # Delete all contents before downloading
     Remove-Item (Join-Path $local_path '*') -Recurse -Force
 }
 else {
-    # Create path
     New-Item -ItemType Directory -Path $local_path -Force
 }
 
-Get-Provider -Name $CONFIG.provider.name -FileName $CONFIG.provider.file_name -Version $CONFIG.provider.version -Path $local_path
+Get-Provider -Name $CONFIG.provider.name -FileName $CONFIG.provider.file_name -Version $CONFIG.provider.version -ProviderPath $provider_path -Path $local_path
 Get-NuGet -Url $CONFIG.nuget.url -FileName $CONFIG.nuget.file_name -Path $local_path
-Get-Bootstrap -Url $CONFIG.bootstrap.url -BootstrapPath $CONFIG.bootstrap.path -Path $local_path
-
-if ($PSBoundParameters.ContainsKey('ProGetPath')) {
-    Get-ProGet -ProGetPath $ProGetPath -ProGetFileName $CONFIG.proget.file_name -Path $local_path
-}
-
-if ($PSBoundParameters.ContainsKey('SqlPath')) {
-    Get-Sql -SqlPath $SqlPath -SqlFileName $CONFIG.sql.file_name -Path $local_path
-}
+Get-Bootstrap -Path $local_path
+Get-ProGet -ProGetPath $ProGetPath -ProGetFileName $CONFIG.proget.file_name -Path $local_path
+Get-Sql -SqlPath $SqlPath -SqlFileName $CONFIG.sql.file_name -Path $local_path
