@@ -122,7 +122,7 @@ function Get-Bootstrap {
             Mandatory = $true,
             ValueFromPipeline = $true,
             ValueFromPipelineByPropertyName = $true,
-            Position = 2
+            Position = 1
         )]
         [string]  $Path
     )
@@ -155,7 +155,7 @@ function Get-ProGet {
         [string]  $Path
     )
     # Archive ProGet installation files
-    Compress-Archive -Path $ProGetPath -DestinationPath (Join-Path $Path $ProGetFileName)
+    Compress-Archive -Path (Join-Path $ProGetPath '*') -DestinationPath (Join-Path $Path $ProGetFileName)
 }
 
 function Get-Sql {
@@ -183,7 +183,7 @@ function Get-Sql {
         [string]  $Path
     )
     # Archive SQL installer
-    Compress-Archive -Path $SqlPath -DestinationPath (Join-Path $Path $SqlFileName)
+    Compress-Archive -Path (Join-Path $SqlPath '*') -DestinationPath (Join-Path $Path $SqlFileName)
 }
 
 # Don't let the script continue with errors

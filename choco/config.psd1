@@ -7,9 +7,10 @@
         file_name = 'nuget.exe'
     }
     proget   = @{
-        server    = 'http://proget.gilman.io:8624'
-        file_name = 'proget.zip'
-        feeds     = @{
+        server     = 'http://proget.gilman.io:8624'
+        file_name  = 'proget.zip'
+        executable = 'hub.exe'
+        feeds      = @{
             posh  = 'internal-powershell'
             choco = 'internal-chocolatey'
         }
@@ -21,6 +22,7 @@
         path      = 'PackageManagement\ProviderAssemblies'
     }
     sql      = @{
-        file_name = 'sql.zip'
+        file_name  = 'sql.zip'
+        executable = 'SETUP.EXE'
     }
 }
