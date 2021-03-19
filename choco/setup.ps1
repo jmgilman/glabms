@@ -10,8 +10,11 @@
    and pointed to the SMB share that will host the bootstrap files. It may be
    necessary to transfer the files to an offline machine that has access to the
    desired SMB share.
+   Note that the script expects local copies of the ProGet and SQL Express
+   installation files to be present. Refer to the lab documentation on how to
+   obtain these files.
 .EXAMPLE
-   .\setup.ps1 -Operation Download -Path C:\my\temp\path
+   .\setup.ps1 -Operation Download -Path C:\my\temp\path -ProGetPath C:\path\to\proget -SqlPath C:\path\to\sql.exe
    .\setup.ps1 -Operation Upload -Path C:\my\temp\path -MountPath \\my.nas.io\path
 .NOTES
     Name: setup.ps1
@@ -41,7 +44,21 @@ param(
         ValueFromPipelineByPropertyName = $true,
         Position = 3
     )]
-    [string]  $MountPath
+    [string]  $MountPath,
+    [Parameter(
+        Mandatory = $false,
+        ValueFromPipeline = $true,
+        ValueFromPipelineByPropertyName = $true,
+        Position = 4
+    )]
+    [string]  $ProGetPath,
+    [Parameter(
+        Mandatory = $false,
+        ValueFromPipeline = $true,
+        ValueFromPipelineByPropertyName = $true,
+        Position = 5
+    )]
+    [string]  $SqlPath
 )
 
 # Don't let the script continue with errors
@@ -57,10 +74,16 @@ $CONFIG = @{
         url       = 'https://aka.ms/psget-nugetexe'
         file_name = 'nuget.exe'
     }
+    proget    = @{
+        file_name = 'proget.zip'
+    }
     provider  = @{
         name      = 'NuGet'
         version   = '2.8.5.201'
         file_name = 'nuget.zip'
+    }
+    sql       = @{
+        file_name = 'sql.exe'
     }
 }
 
@@ -154,14 +177,14 @@ function Get-Bootstrap {
             ValueFromPipelineByPropertyName = $true,
             Position = 2
         )]
-        [string]  $Path,
+        [string]  $BootstrapPath,
         [Parameter(
             Mandatory = $true,
             ValueFromPipeline = $true,
             ValueFromPipelineByPropertyName = $true,
             Position = 2
         )]
-        [string]  $BootstrapPath
+        [string]  $Path
     )
     # Download source to temporary folder
     $temp_folder = New-Item -Type Directory -Path $(Join-Path $Env:Temp $(New-Guid))
@@ -172,6 +195,62 @@ function Get-Bootstrap {
 
     # Copy the bootstrap script to the path
     Copy-Item (Join-Path $temp_folder $BootstrapPath) $Path
+}
+
+function Get-ProGet {
+    param(
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 1
+        )]
+        [string]  $ProGetFolder,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 2
+        )]
+        [string]  $ProGetFileName,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 3
+        )]
+        [string]  $Path
+    )
+    # Archive ProGet installation files
+    Compress-Archive -Path $ProGetFolder -DestinationPath (Join-Path $Path $ProGetFileName)
+}
+
+function Get-Sql {
+    param(
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 1
+        )]
+        [string]  $SqlPath,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 2
+        )]
+        [string]  $SqlFileName,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 3
+        )]
+        [string]  $Path
+    )
+    # Copy SQL installer
+    Copy-Item $SqlPath (Join-Path $Path $SqlFileName)
 }
 
 function Submit-Files {
@@ -208,6 +287,14 @@ switch ($Operation) {
         Get-Provider -Name $CONFIG.provider.name -FileName $CONFIG.provider.file_name -Version $CONFIG.provider.version -Path $Path
         Get-NuGet -Url $CONFIG.nuget.url -FileName $CONFIG.nuget.file_name -Path $Path
         Get-Bootstrap -Url $CONFIG.bootstrap.url -BootstrapPath $CONFIG.bootstrap.path -Path $Path
+
+        if ($PSBoundParameters.ContainsKey('ProGetPath')) {
+            Get-ProGet -ProGetFolder $ProGetPath -ProGetFileName $CONFIG.proget.file_name -Path $Path
+        }
+
+        if ($PSBoundParameters.ContainsKey('SqlPath')) {
+            Get-Sql -SqlPath $SqlPath -SqlFileName $CONFIG.sql.file_name -Path $Path
+        }
         break
     }
     'Upload' {
