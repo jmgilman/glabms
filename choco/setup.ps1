@@ -14,7 +14,7 @@
    installation files to be present. Refer to the lab documentation on how to
    obtain these files.
 .EXAMPLE
-   .\setup.ps1 -Operation Download -Path C:\my\temp\path -ProGetPath C:\path\to\proget -SqlPath C:\path\to\sql.exe
+   .\setup.ps1 -Operation Download -Path C:\my\temp\path -ProGetPath C:\path\to\proget -SqlPath C:\path\to\sql
    .\setup.ps1 -Operation Upload -Path C:\my\temp\path -MountPath \\my.nas.io\path
 .NOTES
     Name: setup.ps1
@@ -83,7 +83,7 @@ $CONFIG = @{
         file_name = 'nuget.zip'
     }
     sql       = @{
-        file_name = 'sql.exe'
+        file_name = 'sql.zip'
     }
 }
 
@@ -205,7 +205,7 @@ function Get-ProGet {
             ValueFromPipelineByPropertyName = $true,
             Position = 1
         )]
-        [string]  $ProGetFolder,
+        [string]  $ProGetPath,
         [Parameter(
             Mandatory = $true,
             ValueFromPipeline = $true,
@@ -222,7 +222,7 @@ function Get-ProGet {
         [string]  $Path
     )
     # Archive ProGet installation files
-    Compress-Archive -Path $ProGetFolder -DestinationPath (Join-Path $Path $ProGetFileName)
+    Compress-Archive -Path $ProGetPath -DestinationPath (Join-Path $Path $ProGetFileName)
 }
 
 function Get-Sql {
@@ -249,8 +249,8 @@ function Get-Sql {
         )]
         [string]  $Path
     )
-    # Copy SQL installer
-    Copy-Item $SqlPath (Join-Path $Path $SqlFileName)
+    # Archive SQL installer
+    Compress-Archive -Path $SqlPath -DestinationPath (Join-Path $Path $SqlFileName)
 }
 
 function Submit-Files {
@@ -289,7 +289,7 @@ switch ($Operation) {
         Get-Bootstrap -Url $CONFIG.bootstrap.url -BootstrapPath $CONFIG.bootstrap.path -Path $Path
 
         if ($PSBoundParameters.ContainsKey('ProGetPath')) {
-            Get-ProGet -ProGetFolder $ProGetPath -ProGetFileName $CONFIG.proget.file_name -Path $Path
+            Get-ProGet -ProGetPath $ProGetPath -ProGetFileName $CONFIG.proget.file_name -Path $Path
         }
 
         if ($PSBoundParameters.ContainsKey('SqlPath')) {
