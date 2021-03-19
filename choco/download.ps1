@@ -155,15 +155,8 @@ function Get-Bootstrap {
         )]
         [string]  $Path
     )
-    # Download source to temporary folder
-    $temp_folder = New-Item -Type Directory -Path $(Join-Path $Env:Temp $(New-Guid))
-    Invoke-WebRequest -Uri $Url -OutFile (Join-Path $temp_folder 'glab.zip')
-
-    # Extract archive
-    Expand-Archive -Path (Join-Path $temp_folder 'glab.zip') -DestinationPath $temp_folder
-
     # Copy the bootstrap script to the path
-    Copy-Item (Join-Path $temp_folder $BootstrapPath) $Path
+    Copy-Item (Join-Path $PSScriptRoot 'bootstrap.ps1') $Path
 }
 
 function Get-ProGet {
