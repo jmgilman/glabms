@@ -7,12 +7,26 @@
         file_name = 'nuget.exe'
     }
     proget   = @{
-        server     = 'http://proget.gilman.io:8624'
+        server     = 'http://proget.gilman.io'
+        port       = '8624'
         file_name  = 'proget.zip'
         executable = 'hub.exe'
         feeds      = @{
-            posh  = 'internal-powershell'
-            choco = 'internal-chocolatey'
+            powershell = @{
+                name        = 'internal-powershell'
+                feedType    = 'powershell'
+                description = 'Internal Powershell feed for hosting modules'
+                active      = $true
+            }
+            chocolatey = @{
+                name        = 'internal-chocolatey'
+                feedType    = 'chocolatey'
+                description = 'Internal Chocolatey feed for hosting programs'
+                active      = $true
+            }
+        }
+        api        = @{
+            feeds_endpoint = '/api/management/feeds/'
         }
     }
     provider = @{

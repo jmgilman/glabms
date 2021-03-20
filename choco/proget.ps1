@@ -18,17 +18,10 @@
 # Parameters
 param(
     [Parameter(
-        Mandatory = $true,
+        Mandatory = $false,
         ValueFromPipeline = $true,
         ValueFromPipelineByPropertyName = $true,
         Position = 1
-    )]
-    [string]  $ConfigFile,
-    [Parameter(
-        Mandatory = $true,
-        ValueFromPipeline = $true,
-        ValueFromPipelineByPropertyName = $true,
-        Position = 2
     )]
     [ValidateSet('ProGet', 'SQL')]
     [string]  $Install,
@@ -36,9 +29,30 @@ param(
         Mandatory = $false,
         ValueFromPipeline = $true,
         ValueFromPipelineByPropertyName = $true,
+        Position = 2
+    )]
+    [switch]  $Configure,
+    [Parameter(
+        Mandatory = $true,
+        ValueFromPipeline = $true,
+        ValueFromPipelineByPropertyName = $true,
         Position = 3
     )]
-    [string]  $License
+    [string]  $ConfigFile,
+    [Parameter(
+        Mandatory = $false,
+        ValueFromPipeline = $true,
+        ValueFromPipelineByPropertyName = $true,
+        Position = 4
+    )]
+    [string]  $License,
+    [Parameter(
+        Mandatory = $false,
+        ValueFromPipeline = $true,
+        ValueFromPipelineByPropertyName = $true,
+        Position = 5
+    )]
+    [string]  $ApiKey
 )
 
 function Install-SQL {
@@ -142,6 +156,43 @@ function Install-ProGet {
     return $true
 }
 
+function Invoke-Api {
+    param(
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 1
+        )]
+        [string]  $ApiKey,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 2
+        )]
+        [string]  $Endpoint,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 3
+        )]
+        [object[]]  $Data
+    )
+    $headers = @{
+        'X-ApiKey' = $ApiKey
+    }
+    $params = @{
+        Method      = 'Post'
+        Uri         = $Endpoint
+        ContentType = 'application/json'
+        Headers     = $headers
+        Body        = ($Data | ConvertTo-Json)
+    }
+    Invoke-RestMethod @params
+}
+
 # Don't let the script continue with errors
 $ErrorActionPreference = 'Stop'
 
@@ -183,42 +234,20 @@ switch ($Install) {
     }
 }
 
-<#
-# Get API key
-$api_key = Read-Host 'Please create an API key with all permissions and enter it here:' -AsSecureString
+if ($Configure) {
+    # Check for API key
+    if (!$PSBoundParameters.ContainsKey('ApiKey')) {
+        Write-Error 'Please supply an API key to configure the ProGet server'
+        exit
+    }
 
-$base_url = 'http://localhost:8624'
-$feed_endpoint = $base_url + '/api/management/feeds/create'
-$headers = @{
-    'X-ApiKey' = $api_key
-}
+    # Configure feeds
+    $base_url = 'http://localhost:' + $CONFIG.proget.port + '/'
+    $feeds_endpoint = $base_url + $CONFIG.proget.api.feeds_endpoint
 
-# Add the Powershell feed
-$request = @{
-    name        = 'internal-powershell'
-    feedType    = 'powershell'
-    description = 'Internal Powershell feed for hosting modules'
-    active      = $true
-}
+    # Powershell feed
+    $resp = Invoke-Api -ApiKey $ApiKey -Endpoint $feeds_endpoint -Data $CONFIG.proget.feeds.powershell
 
-try {
-    Invoke-RestMethod -Method Post -Uri $feed_endpoint -ContentType 'application/json' -Headers $headers -Body ($request | ConvertTo-Json)
+    # Chocolatey feed
+    $resp = Invoke-Api -ApiKey $ApiKey -Endpoint $feeds_endpoint -Data $CONFIG.proget.feeds.chocolatey
 }
-catch {
-    Write-Error "Failed creating Powershell feed: $($error[0])"
-}
-
-# Add the Chocolatey feed
-$request = @{
-    name        = 'internal-chocolatey'
-    feedType    = 'chocolatey'
-    description = 'Internal Chocolatey feed for hosting programs'
-    active      = $true
-}
-
-try {
-    Invoke-RestMethod -Method Post -Uri $feed_endpoint -ContentType 'application/json' -Headers $headers -Body ($request | ConvertTo-Json)
-}
-catch {
-    Write-Error "Failed creating Chocolatey feed: $($error[0])"
-}#>
