@@ -7,6 +7,7 @@
     nuget    = @{
         url       = 'https://aka.ms/psget-nugetexe'
         file_name = 'nuget.exe'
+        path      = 'Microsoft\Windows\PowerShell\PowerShellGet'
     }
     proget   = @{
         server     = 'http://proget.gilman.io'
@@ -32,7 +33,7 @@
         }
     }
     provider = @{
-        name      = 'NuGet'
+        name      = 'nuget'
         file_name = 'provider.zip'
         version   = '2.8.5.201'
         path      = 'PackageManagement\ProviderAssemblies'

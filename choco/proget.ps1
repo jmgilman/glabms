@@ -156,7 +156,7 @@ function Install-ProGet {
     return $true
 }
 
-function Invoke-Api {
+function Install-Provider {
     param(
         [Parameter(
             Mandatory = $true,
@@ -164,19 +164,82 @@ function Invoke-Api {
             ValueFromPipelineByPropertyName = $true,
             Position = 1
         )]
-        [string]  $ApiKey,
+        [string]  $FileFolder,
         [Parameter(
             Mandatory = $true,
             ValueFromPipeline = $true,
             ValueFromPipelineByPropertyName = $true,
             Position = 2
         )]
-        [string]  $Endpoint,
+        [string]  $FileName,
         [Parameter(
             Mandatory = $true,
             ValueFromPipeline = $true,
             ValueFromPipelineByPropertyName = $true,
             Position = 3
+        )]
+        [string]  $ProviderPath
+    )
+    New-Item -Type Directory -Path $ProviderPath -Force | Out-Null
+    Expand-Archive -Path (Join-Path $FileFolder $FileName) -DestinationPath $ProviderPath -Force
+}
+
+function Install-NuGet {
+    param(
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 1
+        )]
+        [string]  $FileFolder,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 2
+        )]
+        [string]  $FileName,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 3
+        )]
+        [string]  $NuGetPath
+    )
+    New-Item -Type Directory -Path $NuGetPath -Force | Out-Null
+    Copy-Item -Path (Join-Path $FileFolder $FileName) -Destination (Join-Path $NuGetPath $FileName) -Force
+}
+
+function Invoke-ProGetApi {
+    param(
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 1
+        )]
+        [string]  $Type,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 2
+        )]
+        [string]  $ApiKey,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 3
+        )]
+        [string]  $Endpoint,
+        [Parameter(
+            Mandatory = $false,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 4
         )]
         [object[]]  $Data
     )
@@ -184,7 +247,51 @@ function Invoke-Api {
         'X-ApiKey' = $ApiKey
     }
     $params = @{
-        Method      = 'Post'
+        Method      = $Type
+        Uri         = $Endpoint
+        ContentType = 'application/json'
+        Headers     = $headers
+        Body        = ($Data | ConvertTo-Json)
+    }
+    Invoke-RestMethod @params
+}
+
+function Invoke-NuGetApi {
+    param(
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 1
+        )]
+        [string]  $Type,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 2
+        )]
+        [string]  $ApiKey,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 3
+        )]
+        [string]  $Endpoint,
+        [Parameter(
+            Mandatory = $false,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 4
+        )]
+        [object[]]  $Data
+    )
+    $headers = @{
+        'X-ApiKey' = $ApiKey
+    }
+    $params = @{
+        Method      = $Type
         Uri         = $Endpoint
         ContentType = 'application/json'
         Headers     = $headers
@@ -234,6 +341,7 @@ switch ($Install) {
     }
 }
 
+# Make this idempotent since it has a decent chance of failing and needing to be rerun
 if ($Configure) {
     # Check for API key
     if (!$PSBoundParameters.ContainsKey('ApiKey')) {
@@ -241,23 +349,87 @@ if ($Configure) {
         exit
     }
 
-    # Configure feeds
+    # Check for NuGet files
+    $provider_path = Join-Path $env:ProgramFiles $CONFIG.provider.path
+    $provider_full_path = Join-Path $env:ProgramFiles $CONFIG.provider.path | Join-Path -ChildPath $CONFIG.provider.name | Join-Path -ChildPath $CONFIG.provider.version
+    if (!(Test-Path $provider_full_path)) {
+        Install-Provider -FileFolder $local_file_folder -FileName $CONFIG.provider.file_name -ProviderPath $provider_path
+    }
+
+    $nuget_path = Join-Path $env:ProgramData $CONFIG.nuget.path
+    $nuget_full_path = Join-Path $env:ProgramData $CONFIG.nuget.path | Join-Path -ChildPath $CONFIG.nuget.file_name
+    if (!(Test-Path $nuget_full_path)) {
+        Install-NuGet -FileFolder $local_file_folder -FileName $CONFIG.nuget.file_name -NuGetPath $nuget_path
+    }
+
     $base_url = 'http://localhost:' + $CONFIG.proget.port + '/'
-    $feeds_endpoint = $base_url + $CONFIG.proget.api.feeds_endpoint + 'create'
+    $ps_repository_url = $base_url + 'nuget/' + $CONFIG.proget.feeds.powershell.name
+    $choco_repository_url = $base_url + 'nuget/' + $CONFIG.proget.feeds.chocolatey.name
+    $feeds_list_endpoint = $base_url + $CONFIG.proget.api.feeds_endpoint + 'list'
+    $feeds_create_endpoint = $base_url + $CONFIG.proget.api.feeds_endpoint + 'create'
+
+    # Check for existing feeds
+    $resp = Invoke-ProGetAPI -Type 'Get' -ApiKey $ApiKey -Endpoint $feeds_list_endpoint
 
     # Powershell feed
-    try {
-        Invoke-Api -ApiKey $ApiKey -Endpoint $feeds_endpoint -Data $CONFIG.proget.feeds.powershell
-    }
-    catch {
-        Write-Error "Failed creating Powershell feed: $($Error[0])"
+    if (!($resp | Where-Object name -EQ $CONFIG.proget.feeds.powershell.name)) {
+        try {
+            Invoke-ProGetApi -Type 'Post' -ApiKey $ApiKey -Endpoint $feeds_create_endpoint -Data $CONFIG.proget.feeds.powershell
+        }
+        catch {
+            Write-Error "Failed creating Powershell feed: $($Error[0])"
+            exit
+        }
     }
 
     # Chocolatey feed
-    try {
-        Invoke-Api -ApiKey $ApiKey -Endpoint $feeds_endpoint -Data $CONFIG.proget.feeds.chocolatey
+    if (!($resp | Where-Object name -EQ $CONFIG.proget.feeds.chocolatey.name)) {
+        try {
+            Invoke-ProGetApi -Type 'Post' -ApiKey $ApiKey -Endpoint $feeds_create_endpoint -Data $CONFIG.proget.feeds.chocolatey
+        }
+        catch {
+            Write-Error "Failed creating Chocolatey feed: $($Error[0])"
+            exit
+        }
     }
-    catch {
-        Write-Error "Failed creating Chocolatey feed: $($Error[0])"
+
+    # Register Powershell feed locally
+    if (!(Get-PSRepository | Where-Object Name -EQ $CONFIG.proget.feeds.powershell.name)) {
+        Register-PSRepository -Name $CONFIG.proget.feeds.powershell.name -SourceLocation $ps_repository_url -PublishLocation $ps_repository_url -InstallationPolicy Trusted 
+    }
+
+    # Publish glab module
+    if (!(Find-Package -Source $CONFIG.proget.feeds.powershell.name | Where-Object Name -EQ 'glab')) {
+        Publish-Module -Path (Join-Path $PSScriptRoot '\modules\glab') -NuGetApiKey $ApiKey -Repository $CONFIG.proget.feeds.powershell.name
+    }
+
+    # Import glab module
+    Import-Module -Name (Join-Path (Get-Location) 'modules\glab')
+
+    # Install Chocolatey (locally)
+    if (!(Get-Command choco -ErrorAction 'SilentlyContinue')) {
+        # Unzip NuGet file
+        $choco_nuget_path = Join-Path $local_file_folder $CONFIG.choco.file_name
+        $choco_zip_path = Join-Path $local_file_folder 'choco.zip'
+        $choco_folder = Join-Path $local_file_folder 'choco'
+        Copy-Item $choco_nuget_path $choco_zip_path
+        Expand-Archive -Path $choco_zip_path -DestinationPath $choco_folder
+
+        # Run install file
+        $installFile = Join-Path $choco_folder 'tools' | Join-Path -ChildPath 'chocolateyInstall.ps1'
+        Start-Process 'powershell.exe' -ArgumentList $installFile -PassThru -NoNewWindow -Wait | Out-Null
+    }
+
+    # Publish Chocolatey NuGet
+    if (!(Get-LatestNuGetPackage -FeedURL $choco_repository_url -PackageName $CONFIG.choco.package_name)) {
+        $choco_nuget_path = Join-Path $local_file_folder $CONFIG.choco.file_name
+        $choco_args = @(
+            $choco_nuget_path,
+            '-source',
+            $choco_repository_url,
+            '-api-key',
+            $ApiKey
+        )
+        Start-Process 'cpush.exe' -ArgumentList $choco_args -PassThru -NoNewWindow -Wait | Out-Null
     }
 }
