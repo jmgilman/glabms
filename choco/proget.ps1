@@ -367,6 +367,7 @@ if ($Configure) {
     $choco_repository_url = $base_url + 'nuget/' + $CONFIG.proget.feeds.chocolatey.name
     $feeds_list_endpoint = $base_url + $CONFIG.proget.api.feeds_endpoint + 'list'
     $feeds_create_endpoint = $base_url + $CONFIG.proget.api.feeds_endpoint + 'create'
+    $assets_endpoint = $base_url + 'endpoints/'
 
     # Check for existing feeds
     $resp = Invoke-ProGetAPI -Type 'Get' -ApiKey $ApiKey -Endpoint $feeds_list_endpoint
@@ -431,5 +432,19 @@ if ($Configure) {
             $ApiKey
         )
         Start-Process 'cpush.exe' -ArgumentList $choco_args -PassThru -NoNewWindow -Wait | Out-Null
+    }
+
+    # Check for assets feed
+    try {
+        Invoke-Api -Type 'Get' -Endpoint ($assets_endpoint + $CONFIG.proget.feeds.bootstrap.name) -ApiKey $ApiKey
+    }
+    catch {
+        try {
+            Invoke-ProGetApi -Type 'Post' -ApiKey $ApiKey -Endpoint $feeds_create_endpoint -Data $CONFIG.proget.feeds.bootstrap
+        }
+        catch {
+            Write-Error "Failed creating Chocolatey feed: $($Error[0])"
+            exit
+        }
     }
 }

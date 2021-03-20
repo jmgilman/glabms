@@ -15,16 +15,22 @@
         file_name  = 'proget.zip'
         executable = 'hub.exe'
         feeds      = @{
-            powershell = @{
-                name        = 'internal-powershell'
-                feedType    = 'powershell'
-                description = 'Internal Powershell feed for hosting modules'
+            bootstrap  = @{ 
+                name        = 'bootstrap'
+                feedType    = 'asset'
+                description = 'Chocolatey bootstrap files'
                 active      = $true
             }
             chocolatey = @{
                 name        = 'internal-chocolatey'
                 feedType    = 'chocolatey'
                 description = 'Internal Chocolatey feed for hosting programs'
+                active      = $true
+            }
+            powershell = @{
+                name        = 'internal-powershell'
+                feedType    = 'powershell'
+                description = 'Internal Powershell feed for hosting modules'
                 active      = $true
             }
         }
