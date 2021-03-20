@@ -243,11 +243,21 @@ if ($Configure) {
 
     # Configure feeds
     $base_url = 'http://localhost:' + $CONFIG.proget.port + '/'
-    $feeds_endpoint = $base_url + $CONFIG.proget.api.feeds_endpoint
+    $feeds_endpoint = $base_url + $CONFIG.proget.api.feeds_endpoint + 'create'
 
     # Powershell feed
-    $resp = Invoke-Api -ApiKey $ApiKey -Endpoint $feeds_endpoint -Data $CONFIG.proget.feeds.powershell
+    try {
+        Invoke-Api -ApiKey $ApiKey -Endpoint $feeds_endpoint -Data $CONFIG.proget.feeds.powershell
+    }
+    catch {
+        Write-Error "Failed creating Powershell feed: $($Error[0])"
+    }
 
     # Chocolatey feed
-    $resp = Invoke-Api -ApiKey $ApiKey -Endpoint $feeds_endpoint -Data $CONFIG.proget.feeds.chocolatey
+    try {
+        Invoke-Api -ApiKey $ApiKey -Endpoint $feeds_endpoint -Data $CONFIG.proget.feeds.chocolatey
+    }
+    catch {
+        Write-Error "Failed creating Chocolatey feed: $($Error[0])"
+    }
 }
