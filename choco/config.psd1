@@ -1,6 +1,8 @@
 @{
     choco    = @{
         package_name = 'chocolatey'
+        url          = 'https://www.nuget.org/api/v2/package/chocolatey/0.10.14'
+        file_name    = 'chocolatey.0.10.14.nupkg'
     }
     nuget    = @{
         url       = 'https://aka.ms/psget-nugetexe'

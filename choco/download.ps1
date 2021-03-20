@@ -116,6 +116,34 @@ function Get-NuGet {
     Invoke-WebRequest -Uri $Url -OutFile (Join-Path $Path $FileName)
 }
 
+function Get-Chocolatey {
+    param(
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 1
+        )]
+        [string]  $Url,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 2
+        )]
+        [string]  $FileName,
+        [Parameter(
+            Mandatory = $true,
+            ValueFromPipeline = $true,
+            ValueFromPipelineByPropertyName = $true,
+            Position = 3
+        )]
+        [string]  $Path
+    )
+    # Download Chocolatey NuGet package to the path
+    Invoke-WebRequest -Uri $Url -OutFile (Join-Path $Path $FileName)
+}
+
 function Get-Bootstrap {
     param(
         [Parameter(
@@ -203,6 +231,7 @@ else {
 
 Get-Provider -Name $CONFIG.provider.name -FileName $CONFIG.provider.file_name -Version $CONFIG.provider.version -ProviderPath $provider_path -Path $local_path
 Get-NuGet -Url $CONFIG.nuget.url -FileName $CONFIG.nuget.file_name -Path $local_path
+Get-Chocolatey -Url $CONFIG.choco.url -FileName $CONFIG.choco.file_name -Path $local_path
 Get-Bootstrap -Path $local_path
 Get-ProGet -ProGetPath $ProGetPath -ProGetFileName $CONFIG.proget.file_name -Path $local_path
 Get-Sql -SqlPath $SqlPath -SqlFileName $CONFIG.sql.file_name -Path $local_path
